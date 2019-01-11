@@ -1,0 +1,22 @@
+name: mavlink bridge
+version: "1.0"
+author: Michal Podhradsky <mpodhradsky@galois.com>
+about: Bridge betwen ZMQ bus and Mavlink UDP channels (typically PX4 simulations)
+args:
+    - NUM_CONNECTIONS:
+        help: How many MAVLink UDP conenctions do we expect
+        required: true
+        index: 1
+    - ZMQ_ADDR_SUB:
+        help: IP address of the ZMQ SUBscriner (to receive messages from)
+        required: true
+        index: 2
+    - ZMQ_BASE_PORT_PUB:
+        help: Base port number of ZMQ Publisher (will increase from this)
+        required: true
+        index: 3
+    - debug:
+        short: d
+        multiple: false
+        help: Emable debug prints
+
