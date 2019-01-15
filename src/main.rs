@@ -28,14 +28,13 @@
 #[macro_use]
 extern crate clap;
 
-use std::sync::Arc;
+use std::sync::{Arc,Mutex};
 use std::thread;
 
 use clap::App;
 
 const BASE_DEVICE_ADDR: &str = "udpin:127.0.0.1";
 const MAVLINK_BASE_PORT: usize = 14540;
-const BASE_PUB_ADDR: &str = "tcp://127.0.0.1";
 
 fn main() {
     // The YAML file is found relative to the current file, similar to how modules are found
@@ -43,24 +42,27 @@ fn main() {
     let matches = App::from_yaml(yaml).get_matches();
 
     let num_connections: usize = matches.value_of("NUM_CONNECTIONS").unwrap().parse().unwrap();
-    let base_port_pub: usize = matches.value_of("ZMQ_BASE_PORT_PUB").unwrap().parse().unwrap();
+    let addr_pub = matches.value_of("ZMQ_ADDR_PUB").unwrap();
     let addr_sub = Arc::new(matches.value_of("ZMQ_ADDR_SUB").unwrap());
 
     let context = zmq::Context::new();
+    let publisher = context.socket(zmq::PUB).unwrap();
+    println!("Publisher: binding to {}",addr_pub);
+    publisher.bind(&addr_pub).unwrap();
+    let publisher_arc = Arc::new(Mutex::new(publisher));
 
     let mut handles = vec![];
     for n in 0..num_connections {
         let device = BASE_DEVICE_ADDR.to_string() + ":" + &(MAVLINK_BASE_PORT+n).to_string();
         println!("#{}: Mavlink connecting to {}", n, device);
         let vehicle = Arc::new(mavlink::connect(&device).unwrap());
-
         let subscriber = context.socket(zmq::SUB).unwrap();
-        let publisher = context.socket(zmq::PUB).unwrap();
-        let addr_pub = BASE_PUB_ADDR.to_string() + ":" + &(base_port_pub + n).to_string();
+        let publisher = publisher_arc.clone();
 
         // ZMQ -> Mavlink thread
         // Rx data from ZMQ, TX data to Mavlink device
         let t = thread::spawn({
+            let debug = matches.is_present("debug");
             let vehicle = vehicle.clone();
             let addr_sub = addr_sub.clone();
             println!("Subscriber {}: connecting to {}",n,addr_sub);
@@ -70,6 +72,9 @@ fn main() {
             move || loop {
                 let stream = subscriber.recv_bytes(0).unwrap();
                 let frame = mavlink::MavFrame::deser(&stream).unwrap();
+                if debug {
+                    println!("MAVLINK TX: {:?}", frame);
+                }
                 vehicle.send_frame(&frame).unwrap();
             }
         });
@@ -79,16 +84,16 @@ fn main() {
         // Rx data from Mavlink, TX data to ZMQ
         let t = thread::spawn({
             let debug = matches.is_present("debug");
-            println!("Publisher {}: connecting to {}",n,addr_pub);
-            publisher.bind(&addr_pub).unwrap();
-
+            
             move || loop {
                 if let Ok(frame) = vehicle.recv_frame() {
                     if debug {
-                        println!("{:?}", frame);
+                        println!("MAVLINK RX: {:?}", frame);
                     }
 
-                    publisher.send(&frame.ser(), 0).unwrap(); // send &w with 0 flags
+                    if let Ok(publisher) = publisher.lock() {
+                        publisher.send(&frame.ser(), 0).unwrap(); // send &w with 0 flags
+                    }
                 }
             }
         });

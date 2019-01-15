@@ -11,8 +11,8 @@ args:
         help: IP address of the ZMQ SUBscriner (to receive messages from)
         required: true
         index: 2
-    - ZMQ_BASE_PORT_PUB:
-        help: Base port number of ZMQ Publisher (will increase from this)
+    - ZMQ_ADDR_PUB:
+        help: IP address of the ZMQ Publisher (will increase from this)
         required: true
         index: 3
     - debug:
