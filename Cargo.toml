@@ -10,6 +10,5 @@ zmq = "0.8"
 clap = {version = "~2.27.0", features = ["yaml"]}
 
 [dependencies.mavlink]
-#git="https://github.com/GaloisInc/rust-mavlink.git"
-#branch = "refactor"
-path = "../rust-mavlink"
+git="https://github.com/GaloisInc/rust-mavlink.git"
+branch = "refactor"
